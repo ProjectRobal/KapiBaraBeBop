@@ -1,0 +1,11 @@
+{
+    "idf.adapterTargetName": "esp32s3",
+    "files.associations": {
+        "wifimanager.h": "c",
+        "cmath": "cpp",
+        "complex": "cpp",
+        "*.tcc": "c",
+        "random": "c"
+    },
+    "C_Cpp.errorSquiggles": "disabled"
+}
