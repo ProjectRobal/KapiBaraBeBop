@@ -161,6 +161,7 @@ void fire_layer(layer_t* layer,float* inputs,float* outputs)
     (*layer->filter)(outputs,layer->size);
 }
 
+// that should be optimised
 void fire_network(layer_t* networks,float *inputs,float *output)
 {
     float *last_output=inputs;

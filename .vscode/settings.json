@@ -5,7 +5,19 @@
         "cmath": "cpp",
         "complex": "cpp",
         "*.tcc": "c",
-        "random": "c"
+        "random": "c",
+        "cstdio": "cpp",
+        "fstream": "cpp",
+        "iostream": "cpp",
+        "array": "cpp",
+        "bitset": "cpp",
+        "buffer": "cpp",
+        "internet": "cpp",
+        "socket": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "regex": "cpp",
+        "utility": "cpp"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }

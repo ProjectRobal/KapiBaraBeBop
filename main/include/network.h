@@ -11,8 +11,8 @@ typedef void(*activation_func)(float*,size_t);
 typedef struct neuron
 {
     size_t size;
+    float bias;
     float* input_weights;
-    float bias;    
 } neuron_t;
 
 typedef struct layer

@@ -32,7 +32,7 @@
 #include "Motor.h"
 
 #include "network.h"
-
+#include "network_serializer.h"
 
 #define VLA_SDA GPIO_NUM_6
 #define VLA_SCL GPIO_NUM_21
@@ -107,6 +107,7 @@ void mutation_layer(layer_t* layer)
     }
 }
 
+
 void main_task(void*arg)
 {
     // init motors
@@ -153,16 +154,43 @@ void main_task(void*arg)
     //vl_setContinousMode(&tofb);
 
     // network weights
+    FILE* file;
 
-    layer_t input_layer=new_layer(64,2,&relu);
+    layer_t input_layer;
 
-    layer_t output_layer=new_layer(4,64,&relu);
+    file=fopen("/littlefs/layer1.bin","r");
+    if((file != NULL)&&load_layer_from_file(file,&input_layer))
+    {
+        ESP_LOGI("MAIN","Loaded layer 1 from file!");
+        input_layer.filter=&relu;
+        fclose(file);
+    }
+    else
+    {
+        input_layer=new_layer(64,2,&relu);
+    }
+    
+    layer_t output_layer;
 
+    file=fopen("/littlefs/layer2.bin","r");
+    if((file != NULL )&&load_layer_from_file(file,&output_layer))
+    {
+        ESP_LOGI("MAIN","Loaded layer 2 from file!");
+        output_layer.filter=&relu;
+        fclose(file);
+    }
+    else
+    {
+        output_layer=new_layer(4,64,&relu);
+    }
+    
     input_layer.next=&output_layer;
 
     float inputs[2]={0.f};
 
     float output[4]={0};
+
+    uint16_t save_ticks=0;
 
     while(1)
     {
@@ -186,6 +214,26 @@ void main_task(void*arg)
         mutation_layer(&input_layer);
         mutation_layer(&output_layer);
 
+        if(save_ticks==2400)
+        {
+            save_ticks=0;
+
+            FILE* file=fopen("/littlefs/layer1.bin","w");
+
+            save_layer_to_file(file,&input_layer);
+
+            fclose(file);
+
+            file=fopen("/littlefs/layer2.bin","w");
+
+            save_layer_to_file(file,&output_layer);
+
+            fclose(file);
+
+            ESP_LOGI("MAIN","Saved layers to file!");
+
+        }
+
         // higher error means higher mutation rate
         float error=((1.f-inputs[0])+(1.f-inputs[1]))/2.f;
 
@@ -208,6 +256,8 @@ void main_task(void*arg)
 
         motor_stop(&left);
         motor_stop(&right);
+
+        save_ticks++;
     }
 
     free_network(&input_layer);
