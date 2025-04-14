@@ -8,6 +8,7 @@
 
 
 #include "esp_dsp.h"
+#include "esp_wifi.h"
 
 #include <esp_log.h>
 
@@ -18,8 +19,6 @@
 #include "VL53L0X.h"
 #include "Motor.h"
 
-#include "network.h"
-#include "network_serializer.h"
 
 #define VLA_SDA GPIO_NUM_6
 #define VLA_SCL GPIO_NUM_21
@@ -39,10 +38,8 @@ void i2c_init();
 
 esp_err_t init_littlefs(bool format_partion_on_failure,const char* partition_name);
 
-void micro_ros_task(void * arg);
 
 TaskHandle_t xMainHandle = NULL;
-TaskHandle_t xRosHandle = NULL;
 
 
 void app_main(void)
@@ -57,40 +54,6 @@ void app_main(void)
 
     xTaskCreatePinnedToCore(main_task,"main",MAIN_TASK_STACK_SIZE,NULL,configMAX_PRIORITIES,&xMainHandle,1-WIFIM_TASK_CORE_ID);
 
-}
-
-
-float clip(float x)
-{
-    if(x>1.f)
-    {
-        return 1.f;
-    }
-
-    return x;
-}
-
-volatile static float mutation_rate=0.1;
-
-void mutation_layer(layer_t* layer)
-{
-    for(size_t i=0;i<layer->size;++i)
-    {
-
-        for(size_t n=0;n<layer->neurons[i].size;++n)
-        {
-            if( mutation_rate > (((float)esp_random())/RAND_MAX) )
-            {
-                layer->neurons[i].input_weights[n]+=gauss(0.f,0.01f);
-            }
-        }
-
-        if( mutation_rate > (((float)esp_random())/RAND_MAX) )
-        {
-                layer->neurons[i].bias+=gauss(0.f,0.01f);
-        }
-
-    }
 }
 
 
@@ -140,113 +103,83 @@ void main_task(void*arg)
     //vl_setContinousMode(&tofb);
 
     // network weights
-    FILE* file;
 
-    layer_t input_layer;
 
-    file=fopen("/littlefs/layer1.bin","r");
-    if((file != NULL)&&load_layer_from_file(file,&input_layer))
-    {
-        ESP_LOGI("MAIN","Loaded layer 1 from file!");
-        input_layer.filter=&relu;
-        fclose(file);
-    }
-    else
-    {
-        input_layer=new_layer(64,2,&relu);
-    }
-    
-    layer_t output_layer;
-
-    file=fopen("/littlefs/layer2.bin","r");
-    if((file != NULL )&&load_layer_from_file(file,&output_layer))
-    {
-        ESP_LOGI("MAIN","Loaded layer 2 from file!");
-        output_layer.filter=&relu;
-        fclose(file);
-    }
-    else
-    {
-        output_layer=new_layer(4,64,&relu);
-    }
-    
-    input_layer.next=&output_layer;
-
-    float inputs[2]={0.f};
-
-    float output[4]={0};
-
-    uint16_t save_ticks=0;
 
     while(1)
     {
+
+        vTaskDelay(50/portTICK_PERIOD_MS);
+
+        bool connection_status = wifi_get_connection_status();
+
+        wifi_ap_record_t ap_info;
+
+        esp_wifi_sta_get_ap_info(&ap_info);
+
+        ESP_LOGI("MAIN","SSID: %s",ap_info.ssid);
+
+        // wait for connections
+        // if( ap_info.ssid[0] == 0 )
+        // {   
+        //     ESP_LOGI("MAIN","Waiting for connection!");
+
+        //     motor_stop(&left);
+        //     motor_stop(&right);
+
+        //     continue;
+        // }
+
+        // get Access Points informations
+
+        
+
         // max distance of 100 mm 
-        inputs[0]=clip(vl_read(&tofa)/100.f);
-        inputs[1]=clip(vl_read(&tofb)/100.f);
+        uint16_t distance_left = vl_read(&tofa);
+        uint16_t distance_right = vl_read(&tofb);
 
-        //ESP_LOGI("MAIN","Left: %f",inputs[0]);
-        //ESP_LOGI("MAIN","Right: %f",inputs[1]);
+        ESP_LOGI("MAIN","Left: %i",distance_left);
+        ESP_LOGI("MAIN","Right: %i",distance_right);
 
-        // decision
 
-        fire_network(&input_layer,inputs,output);
+        int32_t error = distance_left - distance_right;
 
-        /*for(size_t i=0;i<4;i++)
+        if( abs(error) < 100 )
         {
-            ESP_LOGI("MAIN","Output %d: %f",i,output[i]);
-        }*/
+            motor_set_dir(&left,false);
+            motor_set_speed(&left,2048);
 
-        // update weights in layer
-        mutation_layer(&input_layer);
-        mutation_layer(&output_layer);
-
-        if(save_ticks==2400)
+            motor_set_dir(&right,false);
+            motor_set_speed(&right,2048);
+        }
+        else if( error > 0 )
         {
-            save_ticks=0;
+            motor_set_dir(&left,false);
+            motor_set_speed(&left,2048);
 
-            FILE* file=fopen("/littlefs/layer1.bin","w");
+            motor_set_dir(&right,false);
+            motor_set_speed(&right,0);
+        }
+        else
+        {
+            motor_set_dir(&left,false);
+            motor_set_speed(&left,0);
 
-            save_layer_to_file(file,&input_layer);
-
-            fclose(file);
-
-            file=fopen("/littlefs/layer2.bin","w");
-
-            save_layer_to_file(file,&output_layer);
-
-            fclose(file);
-
-            ESP_LOGI("MAIN","Saved layers to file!");
-
+            motor_set_dir(&right,false);
+            motor_set_speed(&right,2048);
         }
 
-        // higher error means higher mutation rate
-        float error=((1.f-inputs[0])+(1.f-inputs[1]))/2.f;
-
-        mutation_rate=0.55*error+0.45*mutation_rate;
-        
-        ESP_LOGI("MAIN","Mutation rate: %f",mutation_rate);
-
-        //step
-        
-        motor_set_dir(&left,output[0]>=output[1]);
-        motor_set_speed(&left,2048);
-
-        motor_set_dir(&right,output[2]>=output[3]);
-        motor_set_speed(&right,2048);
 
         motor_update(&left);
         motor_update(&right);
 
-        vTaskDelay(25/portTICK_PERIOD_MS);
+        
 
-        motor_stop(&left);
-        motor_stop(&right);
+        // motor_stop(&left);
+        // motor_stop(&right);
 
-        save_ticks++;
     }
 
-    free_network(&input_layer);
 }
 
 esp_err_t init_littlefs(bool format_partion_on_failure,const char* partition_name)

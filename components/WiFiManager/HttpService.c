@@ -27,6 +27,8 @@ void start_http(void)
 {
     httpd_config_t config= HTTPD_DEFAULT_CONFIG();
 
+    config.stack_size = 32768;
+
     if(httpd_start(&http_server,&config) == ESP_OK)
     {
 

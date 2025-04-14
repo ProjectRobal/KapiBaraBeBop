@@ -7,8 +7,8 @@ void motor_timer_config(uint32_t freq,ledc_timer_t timer)
     timer_cfg.duty_resolution=LEDC_TIMER_12_BIT;
     timer_cfg.freq_hz=freq;
     timer_cfg.timer_num=timer;
-    timer_cfg.clk_cfg=LEDC_USE_RC_FAST_CLK;
-    timer_cfg.deconfigure=false;
+    timer_cfg.clk_cfg=LEDC_USE_XTAL_CLK;
+    // timer_cfg.deconfigure=false;
 
     ESP_ERROR_CHECK(ledc_timer_config(&timer_cfg));
 }

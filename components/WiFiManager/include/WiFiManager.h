@@ -13,7 +13,7 @@
 
 #define WIFI_TASK_STACK_SIZE 32768
 
-#define WIFI_CONNECTION_ATTEMPTS 3
+#define WIFI_CONNECTION_ATTEMPTS 10
 
 // events bits definition
 
@@ -52,3 +52,5 @@ void wifi_manager_new_ssid_set();
 
 // function that initlialize manager
 void wifi_manager_init(const char* AP_SSID,const char* AP_PSK);
+
+bool wifi_get_connection_status();

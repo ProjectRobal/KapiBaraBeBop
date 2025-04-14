@@ -199,6 +199,11 @@ void wifi_manager_new_ssid_set()
     xEventGroupSetBits(xWiFiStatus,EVENT_BITS_NEW_SSID);
 }
 
+bool wifi_get_connection_status()
+{
+    return !( xEventGroupGetBits(xWiFiStatus) & EVENT_BITS_WIFI_DISCONNECTED ); 
+}
+
 void wifi_manager_loop(void* arg)
 {
     EventBits_t uxBits;
@@ -251,6 +256,8 @@ void wifi_manager_init(const char* AP_SSID,const char* AP_PSK)
     wifi_manager_init_wifi();
 
     xWiFiStatus=xEventGroupCreate();
+
+    // xEventGroupSetBits(xWiFiStatus,EVENT_BITS_WIFI_DISCONNECTED);
 
     xTaskCreatePinnedToCore(wifi_manager_loop,"WiFiManager",WIFI_TASK_STACK_SIZE,NULL,tskIDLE_PRIORITY,&xWifiHandle,WIFIM_TASK_CORE_ID);
 
